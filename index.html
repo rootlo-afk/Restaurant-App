@@ -1,27 +1,77 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Restaurant App</title>
+  <title>Restaurant System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
-    body { font-family: Arial; text-align: center; margin-top: 100px; }
-    a {
-      display: block;
-      margin: 20px;
-      padding: 20px;
-      font-size: 24px;
-      background: #eee;
-      text-decoration: none;
-      color: black;
-      border-radius: 10px;
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #f5f5f5;
     }
+
+    h1 {
+      margin-top: 40px;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 50px;
+    }
+
+    .card {
+      width: 220px;
+      height: 150px;
+      margin: 20px;
+      border-radius: 20px;
+      color: white;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    .service { background: #3498db; }
+    .kitchen { background: #e67e22; }
+    .bar { background: #27ae60; }
+
   </style>
 </head>
 <body>
 
 <h1>🍽️ Restaurant System</h1>
+<p>Bereich auswählen</p>
 
-<a href="service.html">📱 Service</a>
-<a href="kitchen.html">👨‍🍳 Küche</a>
+<div class="container">
+
+  <div class="card service" onclick="openPage('service.html')">
+    🧑‍💼 Service
+  </div>
+
+  <div class="card kitchen" onclick="openPage('kitchen.html')">
+    👨‍🍳 Küche
+  </div>
+
+  <div class="card bar" onclick="openPage('bar.html')">
+    🍺 Bar / Theke
+  </div>
+
+</div>
+
+<script>
+function openPage(page) {
+  window.location.href = page;
+}
+</script>
 
 </body>
 </html>
