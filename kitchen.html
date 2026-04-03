@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Küche</title>
+  <style>
+    body { font-family: Arial; }
+    .order {
+      padding: 10px;
+      margin: 10px;
+      border-radius: 10px;
+    }
+    .offen { background: #eee; }
+    .fertig { background: lightgreen; }
+    button {
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>👨‍🍳 Küche</h1>
+<div id="orders"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase.js"></script>
+
+<script>
+var firebaseConfig = {
+  apiKey: "AIzaSyBFJ6n7f3U3qpfezvqTgx9vugOpMSp284o",
+  authDomain: "oberkellner-app.firebaseapp.com",
+  databaseURL: "https://oberkellner-app-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "oberkellner-app",
+  storageBucket: "oberkellner-app.firebasestorage.app",
+  messagingSenderId: "250391563416",
+  appId: "1:250391563416:web:503f9d74a08cfc0e7bd4ed"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+var ordersDiv = document.getElementById("orders");
+
+// 🔥 Küche live anzeigen
+firebase.database().ref("kitchen").on("value", function(snapshot) {
+  ordersDiv.innerHTML = "";
+
+  snapshot.forEach(function(tableSnap) {
+    let tableId = tableSnap.key;
+
+    let tableDiv = document.createElement("div");
+    tableDiv.innerHTML = `<h2>🪑 Tisch ${tableId}</h2>`;
+
+    tableSnap.forEach(function(orderSnap) {
+      let data = orderSnap.val();
+      let orderId = orderSnap.key;
+
+      let statusClass = data.status === "fertig" ? "fertig" : "offen";
+
+      let orderDiv = document.createElement("div");
+      orderDiv.className = "order " + statusClass;
+
+      orderDiv.innerHTML = `
+        ${data.items.map(i => `• ${i.name} x${i.qty}`).join("<br>")}
+        <br>
+        ${data.status === "offen" 
+          ? `<button onclick="setDone('${tableId}', '${orderId}')">✅ Fertig</button>` 
+          : `<b>✔ Fertig</b>`}
+        <hr>
+      `;
+
+      tableDiv.appendChild(orderDiv);
+    });
+
+    ordersDiv.appendChild(tableDiv);
+  });
+});
+
+// 🔥 Fertig setzen (JETZT RICHTIG!)
+function setDone(tableId, orderId) {
+
+  // Küche updaten
+  firebase.database().ref(`kitchen/${tableId}/${orderId}`).update({
+    status: "fertig"
+  });
+
+  // 🔥 Service (tables) synchronisieren
+  firebase.database().ref(`tables/${tableId}/orders/${orderId}`).update({
+    status: "fertig"
+  });
+}
+</script>
+
+</body>
+</html>
