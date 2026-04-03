@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Theke</title>
+</head>
+<body>
+
+<h1>🍺 Theke</h1>
+<div id="orders"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase.js"></script>
+
+<script>
+var firebaseConfig = {
+  apiKey: "AIzaSyBFJ6n7f3U3qpfezvqTgx9vugOpMSp284o",
+  authDomain: "oberkellner-app.firebaseapp.com",
+  databaseURL: "https://oberkellner-app-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "oberkellner-app",
+  storageBucket: "oberkellner-app.firebasestorage.app",
+  messagingSenderId: "250391563416",
+  appId: "1:250391563416:web:503f9d74a08cfc0e7bd4ed"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+var ordersDiv = document.getElementById("orders");
+
+firebase.database().ref("bar").on("value", function(snapshot) {
+  ordersDiv.innerHTML = "";
+
+  snapshot.forEach(function(tableSnap) {
+    let tableId = tableSnap.key;
+
+    let div = document.createElement("div");
+    div.innerHTML = `<h2>🪑 Tisch ${tableId}</h2>`;
+
+    tableSnap.forEach(orderSnap => {
+      let data = orderSnap.val();
+
+      let items = data.items.map(i => `• ${i.name} x${i.qty}`).join("<br>");
+
+      div.innerHTML += `
+        ${items}
+        
+		
+        <hr>
+      `;
+    });
+
+    ordersDiv.appendChild(div);
+  });
+});
+
+function setDone(tableId, orderId) {
+  firebase.database().ref(`bar/${tableId}/${orderId}`).update({
+    status: "fertig"
+  });
+}
+</script>
+
+</body>
+</html>
