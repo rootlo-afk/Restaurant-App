@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Service</title>
+  <style>
+    body { font-family: Arial; text-align: center; }
+    button { padding: 15px; margin: 5px; font-size: 18px; }
+    .category { margin-top: 20px; }
+
+    .container { display: flex; }
+    .left { width: 50%; padding: 10px; }
+    .right { width: 50%; padding: 10px; background: #f5f5f5; }
+  </style>
+</head>
+<body>
+
+<h1>Bestellung</h1>
+
+<input id="table" placeholder="Tisch Nr"><br>
+
+<h2>Kategorien</h2>
+<div id="categories"></div>
+
+<h2>Warenkorb</h2>
+<div id="cart"></div>
+<h3 id="total">Neue Bestellung: 0€</h3>
+
+<button onclick="sendOrder()">✅ Senden</button>
+
+<hr>
+
+<div class="container">
+
+  <!-- LINKS -->
+  <div class="left">
+    <h2>Tische</h2>
+    <div id="tables"></div>
+  </div>
+
+  <!-- RECHTS -->
+  <div class="right">
+    <h2>💳 Zahlung</h2>
+    <div id="payment"></div>
+    <h3 id="payTotal">0€</h3>
+    <button onclick="confirmPayment()">✅ Bezahlen</button>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase.js"></script>
+
+<script>
+var firebaseConfig = {
+  apiKey: "AIzaSyBFJ6n7f3U3qpfezvqTgx9vugOpMSp284o",
+  authDomain: "oberkellner-app.firebaseapp.com",
+  databaseURL: "https://oberkellner-app-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "oberkellner-app",
+  storageBucket: "oberkellner-app.firebasestorage.app",
+  messagingSenderId: "250391563416",
+  appId: "1:250391563416:web:503f9d74a08cfc0e7bd4ed"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+// 🍽️ Menü
+const menu = {
+  "Essen": [
+    { name: "Pizza", price: 10 },
+    { name: "Pasta", price: 9 },
+    { name: "Schnitzel", price: 25.90 }
+  ],
+  "Getränke": [
+    { name: "Cola", price: 3 },
+    { name: "Bier", price: 4 }
+  ],
+  "Dessert": [
+    { name: "Eis", price: 5 }
+  ]
+};
+
+let cart = {};
+let paymentList = [];
+
+const catDiv = document.getElementById("categories");
+const cartDiv = document.getElementById("cart");
+const totalDiv = document.getElementById("total");
+const tablesDiv = document.getElementById("tables");
+
+// Menü anzeigen
+for (let cat in menu) {
+  let div = document.createElement("div");
+  div.innerHTML = `<h3>${cat}</h3>`;
+
+  menu[cat].forEach(item => {
+    let btn = document.createElement("button");
+    btn.innerText = item.name + " (" + item.price + "€)";
+    btn.onclick = () => addToCart(item);
+    div.appendChild(btn);
+  });
+
+  catDiv.appendChild(div);
+}
+
+// Warenkorb
+function addToCart(item) {
+  if (!cart[item.name]) cart[item.name] = { ...item, qty: 0 };
+  cart[item.name].qty++;
+  renderCart();
+}
+
+function renderCart() {
+  cartDiv.innerHTML = "";
+  let total = 0;
+
+  Object.values(cart).forEach(item => {
+    total += item.price * item.qty;
+
+    let div = document.createElement("div");
+    div.innerHTML = `
+      ${item.name} x${item.qty}
+      <button onclick="changeQty('${item.name}', -1)">➖</button>
+      <button onclick="changeQty('${item.name}', 1)">➕</button>
+    `;
+    cartDiv.appendChild(div);
+  });
+
+  totalDiv.innerText = "Neue Bestellung: " + total + "€";
+}
+
+function changeQty(name, delta) {
+  cart[name].qty += delta;
+  if (cart[name].qty <= 0) delete cart[name];
+  renderCart();
+}
+
+// Bestellung senden
+function sendOrder() {
+  let table = document.getElementById("table").value;
+
+  if (!table || Object.keys(cart).length === 0) {
+    alert("Tisch & Bestellung nötig!");
+    return;
+  }
+
+  let items = Object.values(cart);
+  let total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
+
+  firebase.database().ref("tables/" + table + "/orders").push({
+    items, total, status: "offen", time: Date.now()
+  });
+
+  cart = {};
+  renderCart();
+}
+
+// Tische anzeigen
+firebase.database().ref("tables").on("value", (snapshot) => {
+  tablesDiv.innerHTML = "";
+
+  snapshot.forEach((tableSnap) => {
+    let tableId = tableSnap.key;
+    let total = 0;
+    let hasFinished = false;
+
+    let html = `<h3>🪑 Tisch ${tableId}</h3>`;
+
+    tableSnap.child("orders").forEach((orderSnap) => {
+      let data = orderSnap.val();
+      total += data.total;
+
+      if (data.status === "fertig") hasFinished = true;
+
+      html += data.items.flatMap(i =>
+        Array.from({length: i.qty}, () =>
+          `<button onclick="addToPayment('${tableId}','${orderSnap.key}','${i.name}',${i.price})">
+            ${i.name} (${i.price}€)
+          </button>`
+        )
+      ).join("");
+    });
+
+    html += `<br><b>Gesamt: ${total}€</b><br>`;
+
+    if (hasFinished) {
+      html += `<div style="color:green;">✅ Essen fertig!</div>`;
+    }
+
+    html += `<button onclick="loadFullPayment('${tableId}')">💰 Abrechnen</button>`;
+
+    let div = document.createElement("div");
+    div.innerHTML = html;
+    tablesDiv.appendChild(div);
+  });
+});
+
+// Zahlung
+function addToPayment(tableId, orderId, name, price) {
+  paymentList.push({ tableId, orderId, name, price });
+  renderPayment();
+}
+
+function renderPayment() {
+  const div = document.getElementById("payment");
+  const totalDiv = document.getElementById("payTotal");
+
+  div.innerHTML = "";
+  let total = 0;
+
+  paymentList.forEach((item, index) => {
+    total += item.price;
+
+    let el = document.createElement("div");
+    el.innerHTML = `
+      ${item.name} (${item.price}€)
+      <button onclick="removeFromPayment(${index})">❌</button>
+    `;
+    div.appendChild(el);
+  });
+
+  totalDiv.innerText = total + "€";
+}
+
+function removeFromPayment(index) {
+  paymentList.splice(index, 1);
+  renderPayment();
+}
+
+// Zahlung bestätigen
+function confirmPayment() {
+  if (paymentList.length === 0) return;
+
+  // 🔥 Gruppieren nach orderId
+  let grouped = {};
+
+  paymentList.forEach(item => {
+    let key = item.tableId + "_" + item.orderId;
+
+    if (!grouped[key]) {
+      grouped[key] = {
+        tableId: item.tableId,
+        orderId: item.orderId,
+        items: []
+      };
+    }
+
+    grouped[key].items.push(item.name);
+  });
+
+  let promises = [];
+
+  Object.values(grouped).forEach(group => {
+    let ref = firebase.database().ref(`tables/${group.tableId}/orders/${group.orderId}`);
+
+    let p = ref.once("value").then(snapshot => {
+      let data = snapshot.val();
+      if (!data) return;
+
+      group.items.forEach(name => {
+        let found = data.items.find(i => i.name === name);
+        if (found) found.qty--;
+      });
+
+      // bereinigen
+      data.items = data.items.filter(i => i.qty > 0);
+
+      data.total = data.items.reduce((s, i) => s + i.price * i.qty, 0);
+
+      if (data.items.length === 0) {
+        return ref.remove();
+      } else {
+        return ref.set(data);
+      }
+    });
+
+    promises.push(p);
+  });
+
+  Promise.all(promises).then(() => {
+
+    // 🔥 Tabellen prüfen
+    let tables = [...new Set(paymentList.map(i => i.tableId))];
+
+    tables.forEach(tableId => {
+      firebase.database().ref("tables/" + tableId + "/orders").once("value")
+        .then(snapshot => {
+          if (!snapshot.exists()) {
+            firebase.database().ref("tables/" + tableId).remove();
+          }
+        });
+    });
+
+    paymentList = [];
+    renderPayment();
+  });
+}
+
+// Tisch abrechnen
+function closeTable(tableId) {
+  if (!confirm("Tisch abrechnen?")) return;
+  firebase.database().ref("tables/" + tableId).remove();
+}
+function loadFullPayment(tableId) {
+  paymentList = []; // vorherige Zahlung leeren
+
+  firebase.database().ref("tables/" + tableId + "/orders").once("value")
+    .then(snapshot => {
+
+      snapshot.forEach(orderSnap => {
+        let data = orderSnap.val();
+
+        data.items.forEach(item => {
+          for (let i = 0; i < item.qty; i++) {
+            paymentList.push({
+              tableId: tableId,
+              orderId: orderSnap.key,
+              name: item.name,
+              price: item.price
+            });
+          }
+        });
+      });
+
+      renderPayment();
+    });
+}
+</script>
+
+</body>
+</html>
