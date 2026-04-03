@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Restaurant App</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 100px; }
+    a {
+      display: block;
+      margin: 20px;
+      padding: 20px;
+      font-size: 24px;
+      background: #eee;
+      text-decoration: none;
+      color: black;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🍽️ Restaurant System</h1>
+
+<a href="service.html">📱 Service</a>
+<a href="kitchen.html">👨‍🍳 Küche</a>
+
+</body>
+</html>
