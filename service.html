@@ -19,7 +19,7 @@
 <select id="table"></select><br>
 
 
-<h2>Kategorien</h2>
+
 <div id="categories"></div>
 
 <h2>Warenkorb</h2>
@@ -74,20 +74,7 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 // 🍽️ Menü
-const menu = {
-  "Essen": [
-    { name: "Pizza", price: 10, type: "food" },
-    { name: "Pasta", price: 9, type: "food" },
-    { name: "Schnitzel", price: 25.90, type: "food" }
-  ],
-  "Getränke": [
-    { name: "Cola", price: 3, type: "drink" },
-    { name: "Bier", price: 4, type: "drink" }
-  ],
-  "Dessert": [
-    { name: "Eis", price: 5, type: "food" }
-  ]
-};
+
 
 let cart = {};
 let paymentList = [];
@@ -118,24 +105,77 @@ for (let i = 1; i <= tableCount; i++) {
 }
 
 // Menü anzeigen
-for (let cat in menu) {
-  let div = document.createElement("div");
-  div.innerHTML = `<h3>${cat}</h3>`;
+firebase.database().ref("menu").on("value", snapshot => {
 
-  menu[cat].forEach(item => {
-    let btn = document.createElement("button");
-    btn.innerText = item.name + " (" + item.price.toFixed(2) + "€)";
-    btn.onclick = () => addToCart(item);
-    div.appendChild(btn);
+  catDiv.innerHTML = "";
+
+  snapshot.forEach(catSnap => {
+
+    let catName = catSnap.key;
+
+    let div = document.createElement("div");
+    div.innerHTML = `<h4>${catName}</h4>`;
+
+    catSnap.forEach(itemSnap => {
+
+      let item = {
+  ...itemSnap.val(),
+  category: catName // 🔥 WICHTIG
+};
+
+      let btn = document.createElement("button");
+	  if (catName === "Extras") {
+  btn.style.background = "#2ecc71";
+  btn.style.fontSize = "12px";
+}
+
+      btn.innerText = item.name + " (" + item.price.toFixed(2) + "€)";
+
+      btn.onclick = () => addToCart(item);
+
+      div.appendChild(btn);
+    });
+
+    catDiv.appendChild(div);
   });
 
-  catDiv.appendChild(div);
-}
+});
 
 // Warenkorb
 function addToCart(item) {
-  if (!cart[item.name]) cart[item.name] = { ...item, qty: 0 };
-  cart[item.name].qty++;
+
+  // EXTRA
+  if (item.category === "Extras") {
+
+    let lastKey = Object.keys(cart).slice(-1)[0];
+
+    if (!lastKey) {
+      alert("Erst Gericht wählen!");
+      return;
+    }
+
+    if (!cart[lastKey].extras) cart[lastKey].extras = [];
+
+    cart[lastKey].extras.push({
+      name: item.name,
+      price: Number(item.price)
+    });
+
+    renderCart();
+    return;
+  }
+
+  // GERICHT
+  let id = Date.now() + Math.random();
+
+  cart[id] = {
+    name: item.name,
+    price: Number(item.price),
+    qty: 1,
+    type: item.type,
+    extras: []
+  };
+
   renderCart();
 }
 
@@ -143,24 +183,47 @@ function renderCart() {
   cartDiv.innerHTML = "";
   let total = 0;
 
-  Object.values(cart).forEach(item => {
-    total += item.price * item.qty;
+  Object.entries(cart).forEach(([id, item]) => {
+
+    let itemTotal = item.price * item.qty;
+
+    // 🔥 Extras korrekt berechnen
+    if (item.extras) {
+      let extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+      itemTotal += extrasTotal * item.qty;
+    }
+
+    total += itemTotal;
 
     let div = document.createElement("div");
+
+    let extrasText = "";
+
+    if (item.extras && item.extras.length > 0) {
+      extrasText = item.extras
+        .map(e => "➕ " + e.name + " (+" + e.price.toFixed(2) + "€)")
+        .join("<br>");
+    }
+
     div.innerHTML = `
-      ${item.name} x${item.qty}
-      <button onclick="changeQty('${item.name}', -1)">➖</button>
-      <button onclick="changeQty('${item.name}', 1)">➕</button>
+      <b>${item.name} x${item.qty}</b><br>
+      ${extrasText}
+      <br>
+      <button onclick="changeQty('${id}', -1)">➖</button>
+      <button onclick="changeQty('${id}', 1)">➕</button>
     `;
+
     cartDiv.appendChild(div);
   });
 
   totalDiv.innerText = "Neue Bestellung: " + total.toFixed(2) + "€";
 }
 
-function changeQty(name, delta) {
-  cart[name].qty += delta;
-  if (cart[name].qty <= 0) delete cart[name];
+function changeQty(id, delta) {
+  cart[id].qty += delta;
+
+  if (cart[id].qty <= 0) delete cart[id];
+
   renderCart();
 }
 
@@ -173,24 +236,41 @@ function sendOrder() {
     return;
   }
 
-  let allItems = Object.values(cart);
+  let allItems = Object.values(cart).map(item => ({
+  name: item.name,
+  price: item.price,
+  qty: item.qty,
+  type: item.type,
+  extras: item.extras || []
+}));
 
   let kitchenItems = [];
   let barItems = [];
 
   allItems.forEach(item => {
-    if (item.type === "drink") {
-      barItems.push(item);
-    } else {
-      kitchenItems.push(item);
-    }
-  });
+  if (item.type === "drink") {
+    barItems.push(item);
+  } else {
+    kitchenItems.push(item);
+  }
+});
 
   // 🔥 EINMAL ID ERZEUGEN
   let newOrderRef = firebase.database().ref("tables/" + table + "/orders").push();
   let orderId = newOrderRef.key;
 
-  let total = allItems.reduce((sum, i) => sum + i.price * i.qty, 0);
+  let total = allItems.reduce((sum, i) => {
+
+  let itemTotal = i.price * i.qty;
+
+  if (i.extras && i.extras.length > 0) {
+    let extrasTotal = i.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+    itemTotal += extrasTotal;
+  }
+
+  return sum + itemTotal;
+
+}, 0);
 
   // 👉 TABLES
   newOrderRef.set({
@@ -244,7 +324,21 @@ firebase.database().ref("tables").on("value", (snapshot) => {
   orders.forEach(orderSnap => {
         let data = orderSnap.val();
         hasOrders = true;
-        total += Number(data.total) || 0;
+        let orderTotal = 0;
+
+data.items.forEach(i => {
+
+  let itemTotal = i.price * i.qty;
+
+  if (i.extras && i.extras.length > 0) {
+    let extrasTotal = i.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+    itemTotal += extrasTotal;
+  }
+
+  orderTotal += itemTotal;
+});
+
+total += orderTotal;
 
         if (data.status === "fertig") {
           hasFinished = true;
@@ -273,9 +367,10 @@ btn.innerHTML = `
   ${hasOrders ? `<br><button onclick="loadFullPayment('${tableId}'); event.stopPropagation();">💰 Alles</button>` : ""}
 `;
 
-    if (hasOrders) {
-      btn.onclick = () => openTableDetails(tableId);
-    }
+btn.addEventListener("click", () => {
+  tableSelect.value = tableId;
+  openTableDetails(tableId); // optional
+});
 
     tablesDiv.appendChild(btn);
   }
@@ -283,7 +378,7 @@ btn.innerHTML = `
 
 // Zahlung
 function addToPayment(tableId, orderId, name, price) {
-let totalPaid = paymentList.reduce((sum, i) => sum + i.price, 0);
+
 
 firebase.database().ref("sales").push({
   amount: totalPaid,
@@ -302,13 +397,20 @@ function renderPayment() {
   let total = 0;
 
   paymentList.forEach((item, index) => {
-    total += item.price;
+    let itemPrice = item.price;
+
+if (item.extras) {
+  let extrasTotal = item.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+  itemPrice += extrasTotal;
+}
+
+total += itemPrice;
 
     let el = document.createElement("div");
-    el.innerHTML = `
-      ${item.name} (${item.price}€)
-      <button onclick="removeFromPayment(${index})">❌</button>
-    `;
+el.innerHTML = `
+  ${item.name} (${item.price.toFixed(2)}€)
+  <button onclick="removeFromPayment(${index})">❌</button>
+`;
     div.appendChild(el);
   });
 
@@ -366,7 +468,16 @@ function confirmPayment() {
       if (!data) return;
 
       group.items.forEach(name => {
-        let index = data.items.findIndex(i => i.name === name);
+        let index = data.items.findIndex(i => {
+
+  let fullName = i.name;
+
+  if (i.extras && i.extras.length > 0) {
+    fullName += " + " + i.extras.map(e => e.name).join(", ");
+  }
+
+  return fullName === name;
+});
 
         if (index !== -1) {
           data.items[index].qty--;
@@ -377,7 +488,18 @@ function confirmPayment() {
         }
       });
 
-      data.total = data.items.reduce((s, i) => s + i.price * i.qty, 0);
+      data.total = data.items.reduce((sum, i) => {
+
+  let itemTotal = i.price * i.qty;
+
+  if (i.extras && i.extras.length > 0) {
+    let extrasTotal = i.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+    itemTotal += extrasTotal;
+  }
+
+  return sum + itemTotal;
+
+}, 0);
 
       if (data.items.length === 0) {
         return ref.remove();
@@ -424,15 +546,30 @@ function loadFullPayment(tableId) {
         let data = orderSnap.val();
 
         data.items.forEach(item => {
-          for (let i = 0; i < item.qty; i++) {
-            paymentList.push({
-              tableId: tableId,
-              orderId: orderSnap.key,
-              name: item.name,
-              price: item.price
-            });
-          }
-        });
+  for (let i = 0; i < item.qty; i++) {
+
+    let itemPrice = item.price;
+
+    if (item.extras) {
+      let extrasTotal = item.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+      itemPrice += extrasTotal;
+    }
+	
+	let extrasText = "";
+
+if (item.extras && item.extras.length > 0) {
+  extrasText = " + " + item.extras.map(e => e.name).join(", ");
+}
+
+
+    paymentList.push({
+      tableId: tableId,
+      orderId: orderSnap.key,
+      name: item.name + extrasText,
+      price: itemPrice
+    });
+  }
+});
       });
 
       renderPayment();
@@ -455,31 +592,67 @@ function openTableDetails(tableId) {
         let data = orderSnap.val();
 
         data.items.forEach(item => {
+
           for (let i = 0; i < item.qty; i++) {
 
-            total += item.price;
+            // ✅ PREIS inkl. Extras berechnen
+            let itemPrice = item.price;
 
+            if (item.extras && item.extras.length > 0) {
+              let extrasTotal = item.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+              itemPrice += extrasTotal;
+            }
+
+            // ✅ Gesamtpreis korrekt addieren
+            total += itemPrice;
+
+            // 🔘 Button erstellen
             let btn = document.createElement("button");
             btn.style.display = "block";
             btn.style.width = "100%";
 
-            btn.innerText = item.name + " (" + item.price.toFixed(2) + "€)";
+            // Extras anzeigen
+            let extrasText = "";
 
+            if (item.extras && item.extras.length > 0) {
+              extrasText = item.extras
+                .map(e => "➕ " + e.name)
+                .join("<br>");
+            }
+
+            btn.innerHTML = `
+              ${item.name} (${itemPrice.toFixed(2)}€)
+              <div style="font-size:12px; text-align:left;">
+                ${extrasText}
+              </div>
+            `;
+
+            // 👉 Klick = zur Zahlung hinzufügen
             btn.onclick = () => {
+
+              let extrasLabel = "";
+
+              if (item.extras && item.extras.length > 0) {
+                extrasLabel = " + " + item.extras.map(e => e.name).join(", ");
+              }
+
               paymentList.push({
                 tableId: tableId,
                 orderId: orderSnap.key,
-                name: item.name,
-                price: item.price
+                name: item.name + extrasLabel,
+                price: itemPrice
               });
+
               renderPayment();
             };
 
             div.appendChild(btn);
           }
+
         });
       });
 
+      // ✅ Gesamtanzeige korrekt
       document.getElementById("payTotal").innerText = total.toFixed(2) + "€";
     });
 }
