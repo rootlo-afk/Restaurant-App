@@ -60,7 +60,17 @@ firebase.database().ref("kitchen").on("value", function(snapshot) {
       orderDiv.className = "order " + statusClass;
 
       orderDiv.innerHTML = `
-        ${data.items.map(i => `• ${i.name} x${i.qty}`).join("<br>")}
+        ${data.items.map(i => {
+
+  let extras = "";
+
+  if (i.extras && i.extras.length > 0) {
+    extras = "<br>" + i.extras.map(e => "➕ " + e.name).join("<br>");
+  }
+
+  return `• ${i.name} x${i.qty}${extras}`;
+
+}).join("<br>")}
         <br>
         ${data.status === "offen" 
           ? `<button onclick="setDone('${tableId}', '${orderId}')">✅ Fertig</button>` 
