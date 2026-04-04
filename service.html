@@ -109,9 +109,29 @@ firebase.database().ref("menu").on("value", snapshot => {
 
   catDiv.innerHTML = "";
 
-  snapshot.forEach(catSnap => {
+  // 🔥 Kategorien sammeln
+  let categories = [];
 
-    let catName = catSnap.key;
+  snapshot.forEach(catSnap => {
+    categories.push({
+      name: catSnap.key,
+      data: catSnap
+    });
+  });
+
+  // 🎯 gewünschte Reihenfolge
+  const order = ["Getränke", "Essen", "Extras", "Dessert"];
+
+  // 🔥 sortieren
+  categories.sort((a, b) => {
+    return order.indexOf(a.name) - order.indexOf(b.name);
+  });
+
+  // 🔥 anzeigen
+  categories.forEach(cat => {
+
+    let catName = cat.name;
+    let catSnap = cat.data;
 
     let div = document.createElement("div");
     div.innerHTML = `<h4>${catName}</h4>`;
@@ -119,18 +139,27 @@ firebase.database().ref("menu").on("value", snapshot => {
     catSnap.forEach(itemSnap => {
 
       let item = {
-  ...itemSnap.val(),
-  category: catName // 🔥 WICHTIG
-};
+        ...itemSnap.val(),
+        category: catName
+      };
 
       let btn = document.createElement("button");
-	  if (catName === "Extras") {
-  btn.style.background = "#2ecc71";
-  btn.style.fontSize = "12px";
-}
 
+      // 🎨 Extras Styling
+// 🎨 Einheitliches Styling für alle Buttons
+btn.style.background = "#f8f9fa";
+btn.style.border = "1px solid #ccc";
+btn.style.cursor = "pointer";
+
+// 🔥 Hover-Effekt (für ALLE inkl. Extras)
+btn.onmouseover = () => {
+  btn.style.background = "#dfe6e9";
+};
+
+btn.onmouseout = () => {
+  btn.style.background = "#f8f9fa";
+};
       btn.innerText = item.name + " (" + item.price.toFixed(2) + "€)";
-
       btn.onclick = () => addToCart(item);
 
       div.appendChild(btn);
@@ -349,7 +378,7 @@ total += orderTotal;
     let bg = "#bdc3c7";
 
     if (hasOrders) bg = "#e74c3c";
-    if (hasFinished) bg = "#f39c12";
+    if (hasFinished) bg = "#2ecc71";
 
     let btn = document.createElement("div");
 
