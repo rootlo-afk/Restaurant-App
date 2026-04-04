@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Menü</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body { font-family: Arial; text-align: center; background: #f5f5f5; }
+    input, button, select { padding: 10px; margin: 5px; font-size: 16px; }
+    .item { margin: 10px; padding: 10px; background: white; border-radius: 10px; }
+  </style>
+</head>
+<body>
+
+<h1>🛠️ Admin Menü</h1>
+
+<h2>➕ Neues Gericht</h2>
+
+<input id="name" placeholder="Name">
+<input id="price" type="number" step="0.01" placeholder="Preis">
+
+
+
+<select id="category">
+  <option value="Essen">🍝 Hauptspeisen</option>
+  <option value="Getränke">🍺 Getränke</option>
+  <option value="Dessert">🍰 Dessert</option>
+  <option value="Extras">➕ Extras</option>
+</select>
+
+<br>
+<button onclick="addItem()">➕ Speichern</button>
+
+<hr>
+
+<h2>📋 Speisekarte</h2>
+<div id="menuList"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase.js"></script>
+
+<script>
+var firebaseConfig = {
+  apiKey: "AIzaSyBF...",
+  authDomain: "oberkellner-app.firebaseapp.com",
+  databaseURL: "https://oberkellner-app-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "oberkellner-app",
+};
+firebase.initializeApp(firebaseConfig);
+
+const menuDiv = document.getElementById("menuList");
+
+// 🔥 Anzeige Menü
+firebase.database().ref("menu").on("value", snapshot => {
+
+  menuDiv.innerHTML = "";
+
+  snapshot.forEach(catSnap => {
+
+    let catName = catSnap.key;
+
+    let catTitle = document.createElement("h3");
+    catTitle.innerText = catName;
+    menuDiv.appendChild(catTitle);
+
+    catSnap.forEach(itemSnap => {
+      let item = itemSnap.val();
+      let key = itemSnap.key;
+
+      let div = document.createElement("div");
+      div.className = "item";
+
+      div.innerHTML = `
+        ${item.name} (${item.price.toFixed(2)}€)
+        <br>
+        <button onclick="editItem('${catName}', '${key}', '${item.name}', ${item.price})">✏️</button>
+        <button onclick="deleteItem('${catName}', '${key}')">❌</button>
+      `;
+
+      menuDiv.appendChild(div);
+    });
+
+  });
+
+});
+
+// ➕ hinzufügen
+function addItem() {
+
+  let name = document.getElementById("name").value;
+  let price = parseFloat(document.getElementById("price").value);
+  let category = document.getElementById("category").value;
+
+  let type = (category === "Getränke") ? "drink" : "food";
+
+  if (!name || !price) {
+    alert("Name & Preis nötig!");
+    return;
+  }
+
+  firebase.database().ref("menu/" + category).push({
+    name: name,
+    price: price,
+    type: type,
+    order: Date.now()
+  });
+
+  document.getElementById("name").value = "";
+  document.getElementById("price").value = "";
+}
+
+// ❌ löschen
+function deleteItem(category, key) {
+  if (!confirm("Löschen?")) return;
+
+  firebase.database().ref(`menu/${category}/${key}`).remove();
+}
+
+// ✏️ bearbeiten
+function editItem(category, key, name, price) {
+  let newName = prompt("Name:", name);
+  let newPrice = prompt("Preis:", price);
+
+  if (!newName || !newPrice) return;
+
+  firebase.database().ref(`menu/${category}/${key}`).update({
+    name: newName,
+    price: parseFloat(newPrice)
+  });
+}
+</script>
+
+</body>
+</html>
