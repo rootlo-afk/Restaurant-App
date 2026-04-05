@@ -13,8 +13,14 @@
 <body>
 
 <h1>🛠️ Admin Menü</h1>
+<h3>📁 Neue Kategorie</h3>
+
+<input id="newCategory" placeholder="z.B. Salate">
+<button onclick="addCategory()">➕ Kategorie anlegen</button>
 
 <h2>➕ Neues Gericht</h2>
+
+
 
 <input id="name" placeholder="Name">
 <input id="price" type="number" step="0.01" placeholder="Preis">
@@ -22,7 +28,8 @@
 
 
 <select id="category">
-  <option value="Essen">🍝 Hauptspeisen</option>
+  <option value="Salate">🥗 Salate</option>
+  <option value="Hauptgerichte">🍝 Hauptspeisen</option>
   <option value="Getränke">🍺 Getränke</option>
   <option value="Dessert">🍰 Dessert</option>
   <option value="Extras">➕ Extras</option>
@@ -54,9 +61,29 @@ firebase.database().ref("menu").on("value", snapshot => {
 
   menuDiv.innerHTML = "";
 
-  snapshot.forEach(catSnap => {
+  // 🔥 Kategorien sammeln
+  let categories = [];
 
-    let catName = catSnap.key;
+  snapshot.forEach(catSnap => {
+    categories.push({
+      name: catSnap.key,
+      data: catSnap
+    });
+  });
+
+  // 🎯 gewünschte Reihenfolge
+  const order = ["Getränke", "Salate", "Hauptgerichte", "Extras", "Dessert"];
+
+  // 🔥 sortieren
+  categories.sort((a, b) => {
+    return order.indexOf(a.name) - order.indexOf(b.name);
+  });
+
+  // 🔥 anzeigen
+  categories.forEach(cat => {
+
+    let catName = cat.name;
+    let catSnap = cat.data;
 
     let catTitle = document.createElement("h3");
     catTitle.innerText = catName;
@@ -127,6 +154,33 @@ function editItem(category, key, name, price) {
     price: parseFloat(newPrice)
   });
 }
+// 📁 Kategorie hinzufügen
+function addCategory() {
+
+  let name = document.getElementById("newCategory").value.trim();
+
+  if (!name) {
+    alert("Name fehlt!");
+    return;
+  }
+
+  // Kategorie als leeres Objekt anlegen
+  firebase.database().ref("menu/" + name).set({});
+
+  // optional direkt ins Dropdown aufnehmen
+  let select = document.getElementById("category");
+
+  let option = document.createElement("option");
+  option.value = name;
+  option.text = "📁 " + name;
+
+  select.appendChild(option);
+
+  document.getElementById("newCategory").value = "";
+}
+
+
+
 </script>
 
 </body>
