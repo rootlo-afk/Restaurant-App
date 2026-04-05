@@ -620,11 +620,14 @@ function openTableDetails(tableId) {
       snapshot.forEach(orderSnap => {
         let data = orderSnap.val();
 
-        data.items.forEach(item => {
+        data.items.forEach((item, itemIndex) => {
 
           for (let i = 0; i < item.qty; i++) {
 
-            // ✅ PREIS inkl. Extras berechnen
+            // 🔥 EINDEUTIGE ID pro Position (WICHTIG!)
+            let uniqueId = orderSnap.key + "_" + itemIndex + "_" + i;
+
+            // ✅ Preis inkl Extras
             let itemPrice = item.price;
 
             if (item.extras && item.extras.length > 0) {
@@ -632,15 +635,13 @@ function openTableDetails(tableId) {
               itemPrice += extrasTotal;
             }
 
-            // ✅ Gesamtpreis korrekt addieren
             total += itemPrice;
 
-            // 🔘 Button erstellen
+            // 🔘 Button
             let btn = document.createElement("button");
             btn.style.display = "block";
             btn.style.width = "100%";
 
-            // Extras anzeigen
             let extrasText = "";
 
             if (item.extras && item.extras.length > 0) {
@@ -656,7 +657,7 @@ function openTableDetails(tableId) {
               </div>
             `;
 
-            // 👉 Klick = zur Zahlung hinzufügen
+            // 👉 Klick = auswählen / abwählen
             btn.onclick = () => {
 
               let extrasLabel = "";
@@ -665,14 +666,29 @@ function openTableDetails(tableId) {
                 extrasLabel = " + " + item.extras.map(e => e.name).join(", ");
               }
 
-              paymentList.push({
+              let entry = {
+                id: uniqueId, // 🔥 HIER IST DER FIX
                 tableId: tableId,
                 orderId: orderSnap.key,
                 name: item.name + extrasLabel,
                 price: itemPrice
-              });
+              };
 
-              renderPayment();
+              let index = paymentList.findIndex(p => p.id === entry.id);
+
+              if (index !== -1) {
+                // ❌ entfernen
+                paymentList.splice(index, 1);
+                btn.style.background = "";
+                btn.style.color = "black";
+              } else {
+                // ✅ hinzufügen
+                paymentList.push(entry);
+                btn.style.background = "#2ecc71";
+                btn.style.color = "white";
+              }
+
+              updateSelectedTotal();
             };
 
             div.appendChild(btn);
@@ -681,11 +697,123 @@ function openTableDetails(tableId) {
         });
       });
 
-      // ✅ Gesamtanzeige korrekt
-      document.getElementById("payTotal").innerText = total.toFixed(2) + "€";
+      // ❗ NICHT Gesamtpreis anzeigen → wir nutzen Auswahl
+      updateSelectedTotal();
     });
 }
 
+function openTableDetails(tableId) {
+
+  paymentList = [];
+
+  firebase.database().ref("tables/" + tableId + "/orders").once("value")
+    .then(snapshot => {
+
+      const div = document.getElementById("payment");
+      div.innerHTML = `<h3>🪑 Tisch ${tableId}</h3>`;
+
+      let total = 0;
+
+      snapshot.forEach(orderSnap => {
+        let data = orderSnap.val();
+
+        data.items.forEach((item, itemIndex) => {
+
+          for (let i = 0; i < item.qty; i++) {
+
+            // 🔥 EINDEUTIGE ID pro Position (WICHTIG!)
+            let uniqueId = orderSnap.key + "_" + itemIndex + "_" + i;
+
+            // ✅ Preis inkl Extras
+            let itemPrice = item.price;
+
+            if (item.extras && item.extras.length > 0) {
+              let extrasTotal = item.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+              itemPrice += extrasTotal;
+            }
+
+            total += itemPrice;
+
+            // 🔘 Button
+            let btn = document.createElement("button");
+            btn.style.display = "block";
+            btn.style.width = "100%";
+
+            let extrasText = "";
+
+            if (item.extras && item.extras.length > 0) {
+              extrasText = item.extras
+                .map(e => "➕ " + e.name)
+                .join("<br>");
+            }
+
+            btn.innerHTML = `
+              ${item.name} (${itemPrice.toFixed(2)}€)
+              <div style="font-size:12px; text-align:left;">
+                ${extrasText}
+              </div>
+            `;
+
+            // 👉 Klick = auswählen / abwählen
+            btn.onclick = () => {
+
+              let extrasLabel = "";
+
+              if (item.extras && item.extras.length > 0) {
+                extrasLabel = " + " + item.extras.map(e => e.name).join(", ");
+              }
+
+              let entry = {
+                id: uniqueId, // 🔥 HIER IST DER FIX
+                tableId: tableId,
+                orderId: orderSnap.key,
+                name: item.name + extrasLabel,
+                price: itemPrice
+              };
+
+              let index = paymentList.findIndex(p => p.id === entry.id);
+
+              if (index !== -1) {
+                // ❌ entfernen
+                paymentList.splice(index, 1);
+                btn.style.background = "";
+                btn.style.color = "black";
+              } else {
+                // ✅ hinzufügen
+                paymentList.push(entry);
+                btn.style.background = "#2ecc71";
+                btn.style.color = "white";
+              }
+
+              updateSelectedTotal();
+            };
+
+            div.appendChild(btn);
+          }
+
+        });
+      });
+
+      // ❗ NICHT Gesamtpreis anzeigen → wir nutzen Auswahl
+      updateSelectedTotal();
+    });
+}
+
+
+function updateSelectedTotal() {
+
+  let total = 0;
+
+  paymentList.forEach(item => {
+    total += Number(item.price) || 0;
+  });
+
+  // 🔥 DEBUG (optional)
+  console.log("Ausgewählt:", paymentList);
+  console.log("Summe:", total);
+
+  document.getElementById("payTotal").innerText = total.toFixed(2) + "€";
+}
 // 🔥 HIER EINFÜGEN (ganz unten)
 firebase.database().ref("sales").on("value", snapshot => {
 
