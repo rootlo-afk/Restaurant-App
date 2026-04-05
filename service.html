@@ -555,8 +555,14 @@ function confirmPayment() {
         });
     });
 
-    paymentList = [];
-    renderPayment();
+
+  let tableId = paymentList[0].tableId; // 🔥 Tisch merken
+
+  paymentList = [];
+
+  openTableDetails(tableId); // 🔥 Tisch neu laden = wie Klick
+
+
   });
 }
 
