@@ -136,34 +136,42 @@ firebase.database().ref("menu").on("value", snapshot => {
     let div = document.createElement("div");
     div.innerHTML = `<h4>${catName}</h4>`;
 
-    catSnap.forEach(itemSnap => {
+ // 🔥 Items sammeln
+let items = [];
 
-      let item = {
-        ...itemSnap.val(),
-        category: catName
-      };
+catSnap.forEach(itemSnap => {
+  items.push({
+    key: itemSnap.key,
+    ...itemSnap.val()
+  });
+});
 
-      let btn = document.createElement("button");
+// 🔥 Alphabetisch sortieren
+items.sort((a, b) => a.name.localeCompare(b.name, "de"));
 
-      // 🎨 Extras Styling
-// 🎨 Einheitliches Styling für alle Buttons
-btn.style.background = "#f8f9fa";
-btn.style.border = "1px solid #ccc";
-btn.style.cursor = "pointer";
+// 🔥 Anzeigen
+items.forEach(item => {
 
-// 🔥 Hover-Effekt (für ALLE inkl. Extras)
-btn.onmouseover = () => {
-  btn.style.background = "#dfe6e9";
-};
+  let btn = document.createElement("button");
 
-btn.onmouseout = () => {
   btn.style.background = "#f8f9fa";
-};
-      btn.innerText = item.name + " (" + item.price.toFixed(2) + "€)";
-      btn.onclick = () => addToCart(item);
+  btn.style.border = "1px solid #ccc";
+  btn.style.cursor = "pointer";
 
-      div.appendChild(btn);
-    });
+  btn.onmouseover = () => {
+    btn.style.background = "#dfe6e9";
+  };
+
+  btn.onmouseout = () => {
+    btn.style.background = "#f8f9fa";
+  };
+
+  btn.innerText = item.name + " (" + item.price.toFixed(2) + "€)";
+  btn.onclick = () => addToCart(item);
+
+  div.appendChild(btn);
+
+});
 
     catDiv.appendChild(div);
   });
