@@ -89,22 +89,34 @@ firebase.database().ref("menu").on("value", snapshot => {
     catTitle.innerText = catName;
     menuDiv.appendChild(catTitle);
 
-    catSnap.forEach(itemSnap => {
-      let item = itemSnap.val();
-      let key = itemSnap.key;
+// 🔥 Items sammeln
+let items = [];
 
-      let div = document.createElement("div");
-      div.className = "item";
+catSnap.forEach(itemSnap => {
+  items.push({
+    key: itemSnap.key,
+    ...itemSnap.val()
+  });
+});
 
-      div.innerHTML = `
-        ${item.name} (${item.price.toFixed(2)}€)
-        <br>
-        <button onclick="editItem('${catName}', '${key}', '${item.name}', ${item.price})">✏️</button>
-        <button onclick="deleteItem('${catName}', '${key}')">❌</button>
-      `;
+// 🔥 nach Preis sortieren (aufsteigend)
+items.sort((a, b) => a.price - b.price);
 
-      menuDiv.appendChild(div);
-    });
+// 🔥 anzeigen
+items.forEach(item => {
+
+  let div = document.createElement("div");
+  div.className = "item";
+
+  div.innerHTML = `
+    ${item.name} (${item.price.toFixed(2)}€)
+    <br>
+    <button onclick="editItem('${catName}', '${item.key}', '${item.name}', ${item.price})">✏️</button>
+    <button onclick="deleteItem('${catName}', '${item.key}')">❌</button>
+  `;
+
+  menuDiv.appendChild(div);
+});
 
   });
 
