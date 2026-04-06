@@ -140,10 +140,11 @@ firebase.database().ref("menu").on("value", snapshot => {
 let items = [];
 
 catSnap.forEach(itemSnap => {
-  items.push({
-    key: itemSnap.key,
-    ...itemSnap.val()
-  });
+items.push({
+  key: itemSnap.key,
+  ...itemSnap.val(),
+  category: catName // 🔥 wenn DAS FEHLT werden die Extras nicht direkt den Gericht zugeordnet
+});
 });
 
 // 🔥 Alphabetisch sortieren
