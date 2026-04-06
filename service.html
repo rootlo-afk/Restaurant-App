@@ -709,7 +709,10 @@ function renderTables() {
 
   renderTableSelect();
 
-  firebase.database().ref("tables").once("value").then(snapshot => {
+  // 🔥 alte Listener entfernen (wichtig!)
+  firebase.database().ref("tables").off();
+
+  firebase.database().ref("tables").on("value", snapshot => {
 
     tablesDiv.innerHTML = "";
 
@@ -767,10 +770,11 @@ function renderTables() {
       btn.style.cursor = "pointer";
       btn.style.textAlign = "center";
 
-      btn.innerHTML = `
-        🪑 Tisch ${tableId}<br>
-        ${hasOrders ? total.toFixed(2) + "€" : "frei"}
-      `;
+	btn.innerHTML = `
+	🪑 Tisch ${tableId}<br>
+	${hasOrders ? total.toFixed(2) + "€" : "frei"}
+	${hasOrders ? `<br><button onclick="loadFullPayment('${tableId}'); event.stopPropagation();">💰 Alles</button>` : ""}
+	`;
 
       btn.onclick = () => {
         tableSelect.value = tableId;
