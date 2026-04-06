@@ -34,11 +34,25 @@
 
   <!-- LINKS -->
   <div class="left">
-<h2>Tische</h2>
-<select id="tableRange" onchange="renderTables()">
-  <option value="1-10">Tische 1–10</option>
-  <option value="11-20">Tische 11–20</option>
-  <option value="21-30">Tische 21–30</option>
+
+<div style="
+  display:flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+">
+
+  <h2 style="margin:0; margin-left:15px;">Tische</h2>
+
+  <div style="display:flex; gap:10px; align-items:center;">
+    Von <input id="rangeStart" type="number" value="1" style="width:70px; padding:8px;">
+    Bis <input id="rangeEnd" type="number" value="10" style="width:70px; padding:8px;">
+    <button onclick="renderTables()" style="padding:8px 12px; font-size:14px;">
+      Anzeigen
+    </button>
+  </div>
+
+</div>
 </select>
 <div id="tables" style="
   display: grid;
@@ -716,9 +730,13 @@ function renderTables() {
 
     tablesDiv.innerHTML = "";
 
-    let range = document.getElementById("tableRange").value.split("-");
-    let start = parseInt(range[0]);
-    let end = parseInt(range[1]);
+		let start = parseInt(document.getElementById("rangeStart").value);
+		let end = parseInt(document.getElementById("rangeEnd").value);
+		
+		if (start > end) {
+  alert("Start muss kleiner als Ende sein!");
+  return;
+}
 
     for (let i = start; i <= end; i++) {
 
@@ -790,9 +808,10 @@ function renderTableSelect() {
 
   tableSelect.innerHTML = "";
 
-  let range = document.getElementById("tableRange").value.split("-");
-  let start = parseInt(range[0]);
-  let end = parseInt(range[1]);
+let start = parseInt(document.getElementById("rangeStart").value);
+let end = parseInt(document.getElementById("rangeEnd").value);
+
+if (start > end) return;
 
   let defaultOption = document.createElement("option");
   defaultOption.value = "";
