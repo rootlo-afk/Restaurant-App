@@ -35,6 +35,11 @@
   <!-- LINKS -->
   <div class="left">
 <h2>Tische</h2>
+<select id="tableRange" onchange="renderTables()">
+  <option value="1-10">Tische 1–10</option>
+  <option value="11-20">Tische 11–20</option>
+  <option value="21-30">Tische 21–30</option>
+</select>
 <div id="tables" style="
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -340,79 +345,7 @@ function sendOrder() {
   renderCart();
 }
 
-// Tische anzeigen
-firebase.database().ref("tables").on("value", (snapshot) => {
-  tablesDiv.innerHTML = "";
 
-  for (let i = 1; i <= tableCount; i++) {
-
-    let tableId = i.toString();
-    let tableSnap = snapshot.child(tableId);
-
-    let hasOrders = false;
-    let hasFinished = false;
-    let total = 0;
-
-    if (tableSnap.exists() && tableSnap.child("orders").exists()) {
-
-  let orders = tableSnap.child("orders");
-
-  hasOrders = true;
-
-  orders.forEach(orderSnap => {
-        let data = orderSnap.val();
-        hasOrders = true;
-        let orderTotal = 0;
-
-data.items.forEach(i => {
-
-  let itemTotal = i.price * i.qty;
-
-  if (i.extras && i.extras.length > 0) {
-    let extrasTotal = i.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
-    itemTotal += extrasTotal;
-  }
-
-  orderTotal += itemTotal;
-});
-
-total += orderTotal;
-
-        if (data.status === "fertig") {
-          hasFinished = true;
-        }
-      });
-    }
-
-    let bg = "#bdc3c7";
-
-    if (hasOrders) bg = "#e74c3c";
-    if (hasFinished) bg = "#2ecc71";
-
-    let btn = document.createElement("div");
-
-    btn.style.background = bg;
-    btn.style.padding = "30px";
-    btn.style.borderRadius = "15px";
-    btn.style.color = "white";
-    btn.style.fontSize = "20px";
-    btn.style.cursor = "pointer";
-    btn.style.textAlign = "center";
-
-btn.innerHTML = `
-  🪑 Tisch ${tableId}<br>
-  ${hasOrders ? total.toFixed(2) + "€" : "frei"}
-  ${hasOrders ? `<br><button onclick="loadFullPayment('${tableId}'); event.stopPropagation();">💰 Alles</button>` : ""}
-`;
-
-btn.addEventListener("click", () => {
-  tableSelect.value = tableId;
-  openTableDetails(tableId); // optional
-});
-
-    tablesDiv.appendChild(btn);
-  }
-});
 
 // Zahlung
 function addToPayment(tableId, orderId, name, price) {
@@ -717,102 +650,7 @@ function openTableDetails(tableId) {
     });
 }
 
-function openTableDetails(tableId) {
 
-  paymentList = [];
-
-  firebase.database().ref("tables/" + tableId + "/orders").once("value")
-    .then(snapshot => {
-
-      const div = document.getElementById("payment");
-      div.innerHTML = `<h3>🪑 Tisch ${tableId}</h3>`;
-
-      let total = 0;
-
-      snapshot.forEach(orderSnap => {
-        let data = orderSnap.val();
-
-        data.items.forEach((item, itemIndex) => {
-
-          for (let i = 0; i < item.qty; i++) {
-
-            // 🔥 EINDEUTIGE ID pro Position (WICHTIG!)
-            let uniqueId = orderSnap.key + "_" + itemIndex + "_" + i;
-
-            // ✅ Preis inkl Extras
-            let itemPrice = item.price;
-
-            if (item.extras && item.extras.length > 0) {
-              let extrasTotal = item.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
-              itemPrice += extrasTotal;
-            }
-
-            total += itemPrice;
-
-            // 🔘 Button
-            let btn = document.createElement("button");
-            btn.style.display = "block";
-            btn.style.width = "100%";
-
-            let extrasText = "";
-
-            if (item.extras && item.extras.length > 0) {
-              extrasText = item.extras
-                .map(e => "➕ " + e.name)
-                .join("<br>");
-            }
-
-            btn.innerHTML = `
-              ${item.name} (${itemPrice.toFixed(2)}€)
-              <div style="font-size:12px; text-align:left;">
-                ${extrasText}
-              </div>
-            `;
-
-            // 👉 Klick = auswählen / abwählen
-            btn.onclick = () => {
-
-              let extrasLabel = "";
-
-              if (item.extras && item.extras.length > 0) {
-                extrasLabel = " + " + item.extras.map(e => e.name).join(", ");
-              }
-
-              let entry = {
-                id: uniqueId, // 🔥 HIER IST DER FIX
-                tableId: tableId,
-                orderId: orderSnap.key,
-                name: item.name + extrasLabel,
-                price: itemPrice
-              };
-
-              let index = paymentList.findIndex(p => p.id === entry.id);
-
-              if (index !== -1) {
-                // ❌ entfernen
-                paymentList.splice(index, 1);
-                btn.style.background = "";
-                btn.style.color = "black";
-              } else {
-                // ✅ hinzufügen
-                paymentList.push(entry);
-                btn.style.background = "#2ecc71";
-                btn.style.color = "white";
-              }
-
-              updateSelectedTotal();
-            };
-
-            div.appendChild(btn);
-          }
-
-        });
-      });
-
-      // ❗ NICHT Gesamtpreis anzeigen → wir nutzen Auswahl
-      updateSelectedTotal();
-    });
-}
 
 
 function updateSelectedTotal() {
@@ -867,6 +705,106 @@ firebase.database().ref("sales").on("value", snapshot => {
   document.getElementById("salesToday").innerText = todayTotal.toFixed(2) + "€";
   document.getElementById("salesMonth").innerText = monthTotal.toFixed(2) + "€";
 });
+function renderTables() {
+
+  renderTableSelect();
+
+  firebase.database().ref("tables").once("value").then(snapshot => {
+
+    tablesDiv.innerHTML = "";
+
+    let range = document.getElementById("tableRange").value.split("-");
+    let start = parseInt(range[0]);
+    let end = parseInt(range[1]);
+
+    for (let i = start; i <= end; i++) {
+
+      let tableId = i.toString();
+      let tableSnap = snapshot.child(tableId);
+
+      let hasOrders = false;
+      let hasFinished = false;
+      let total = 0;
+
+      if (tableSnap.exists() && tableSnap.child("orders").exists()) {
+
+        let orders = tableSnap.child("orders");
+
+        hasOrders = true;
+
+        orders.forEach(orderSnap => {
+          let data = orderSnap.val();
+
+          data.items.forEach(i => {
+
+            let itemTotal = i.price * i.qty;
+
+            if (i.extras && i.extras.length > 0) {
+              let extrasTotal = i.extras.reduce((s, e) => s + (Number(e.price) || 0), 0);
+              itemTotal += extrasTotal;
+            }
+
+            total += itemTotal;
+          });
+
+          if (data.status === "fertig") {
+            hasFinished = true;
+          }
+        });
+      }
+
+      let bg = "#bdc3c7";
+      if (hasOrders) bg = "#e74c3c";
+      if (hasFinished) bg = "#2ecc71";
+
+      let btn = document.createElement("div");
+
+      btn.style.background = bg;
+      btn.style.padding = "30px";
+      btn.style.borderRadius = "15px";
+      btn.style.color = "white";
+      btn.style.fontSize = "20px";
+      btn.style.cursor = "pointer";
+      btn.style.textAlign = "center";
+
+      btn.innerHTML = `
+        🪑 Tisch ${tableId}<br>
+        ${hasOrders ? total.toFixed(2) + "€" : "frei"}
+      `;
+
+      btn.onclick = () => {
+        tableSelect.value = tableId;
+        openTableDetails(tableId);
+      };
+
+      tablesDiv.appendChild(btn);
+    }
+
+  });
+}
+function renderTableSelect() {
+
+  tableSelect.innerHTML = "";
+
+  let range = document.getElementById("tableRange").value.split("-");
+  let start = parseInt(range[0]);
+  let end = parseInt(range[1]);
+
+  let defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.text = "Tisch wählen";
+  defaultOption.disabled = true;
+  defaultOption.selected = true;
+  tableSelect.appendChild(defaultOption);
+
+  for (let i = start; i <= end; i++) {
+    let option = document.createElement("option");
+    option.value = i;
+    option.text = "Tisch " + i;
+    tableSelect.appendChild(option);
+  }
+}
+renderTables();
 </script>
 
 </body>
